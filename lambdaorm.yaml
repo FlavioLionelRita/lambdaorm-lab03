@@ -1,0 +1,116 @@
+app:
+  src: src
+  data: data
+  models: models
+  defaultDatabase: mydb
+databases:
+  - name: mydb
+    dialect: mysql
+    schema: countries
+    connection:
+      host: localhost
+      port: 3306
+      user: test
+      password: test
+      database: test
+      multipleStatements: true
+      waitForConnections: true
+      connectionLimit: 10
+      queueLimit: 0
+  - name: mydb2
+    dialect: mysql
+    schema: countries2
+    connection:
+      host: localhost
+      port: 3306
+      user: test
+      password: test
+      database: test2
+      multipleStatements: true
+      waitForConnections: true
+      connectionLimit: 10
+      queueLimit: 0
+schemas:
+  - name: countries
+    entities:
+      - name: Positions
+        abstract: true
+        properties:
+          - name: latitude
+            length: 16
+          - name: longitude
+            length: 16
+      - name: Countries
+        extends: Positions
+        primaryKey: ["iso3"]
+        uniqueKey: ["name"]
+        properties:
+          - name: name
+            nullable: false
+          - name: iso3
+            length: 3
+            nullable: false
+          - name: iso2
+            nullable: false
+            length: 2
+          - name: capital
+          - name: currency
+          - name: region
+          - name: subregion
+        relations:
+          - name: states
+            type: manyToOne
+            composite: true
+            from: iso3
+            entity: States
+            to: countryCode
+      - name: States
+        extends: Positions
+        primaryKey: ["id"]
+        uniqueKey: ["countryCode", "name"]
+        properties:
+          - name: id
+            type: integer
+            nullable: false
+          - name: name
+            nullable: false
+          - name: countryCode
+            nullable: false
+            length: 3
+  - name: countries2
+    extends: countries
+    excludeModel: true
+    entities:
+      - name: Positions
+        abstract: true
+        properties:
+          - name: latitude
+            mapping: LATITUDE
+          - name: longitude
+            mapping: LONGITUDE
+      - name: Countries
+        mapping: TBL_COUNTRIES
+        properties:
+          - name: name
+            mapping: NAME
+          - name: iso3
+            mapping: ISO_3
+          - name: iso2
+            mapping: ISO_2
+          - name: capital
+            mapping: CAPITAL
+          - name: currency
+            mapping: CURRENCY
+          - name: region
+            mapping: REGION
+          - name: subregion
+            mapping: SUB_REGION
+      - name: States
+        mapping: TBL_STATES
+        properties:
+          - name: id
+            mapping: ID
+          - name: name
+            mapping: NAME
+          - name: countryCode
+            mapping: COUNTRY_CODE
