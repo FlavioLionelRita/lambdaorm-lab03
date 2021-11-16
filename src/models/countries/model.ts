@@ -17,32 +17,24 @@ export class Country extends Position {
 
 	name?: string
 	iso3?: string
-	iso2?: string
-	capital?: string
-	currency?: string
-	region?: string
-	subregion?: string
 	states: State[]
 }
 export interface QryCountry extends QryPosition {
 	name: string
 	iso3: string
-	iso2: string
-	capital: string
-	currency: string
-	region: string
-	subregion: string
 	states: ManyToOne<State> & State[]
 }
 export class State extends Position {
 	id?: number
 	name?: string
 	countryCode?: string
+	country?: Country
 }
 export interface QryState extends QryPosition {
 	id: number
 	name: string
 	countryCode: string
+	country: Country & OneToMany<Country> & Country
 }
 export let Positions: Queryable<QryPosition>
 export let Countries: Queryable<QryCountry>

@@ -8,6 +8,21 @@ In this laboratory we will see:
 - how to work with two schemas and databases that share the same model
 - how to use imported data from one database to import it into another
 
+## Schema diagram
+
+In this scheme we can see how to extend the schema.
+
+![schema](schema2.png)
+
+We use the extends attribute in the definition of the schema to extend it.
+
+```yaml
+schemas:
+  - name: countries    
+  - name: countries2
+    extends: countries
+```
+
 ## Pre requirements
 
 ### Create database for test
@@ -17,8 +32,8 @@ Create file "docker-compose.yaml"
 ```yaml
 version: '3'
 services:
-  test:
-    container_name: lambdaorm-test
+  mysql:
+    container_name: lambdaorm-mysql
     image: mysql:5.7
     restart: always
     environment:
@@ -28,9 +43,19 @@ services:
       - MYSQL_ROOT_PASSWORD=root
     ports:
       - 3306:3306
+  postgres:
+    container_name: lambdaorm-postgres
+    image: postgres:10
+    restart: always
+    environment:
+      - POSTGRES_DB=test
+      - POSTGRES_USER=test
+      - POSTGRES_PASSWORD=test
+    ports:
+      - '5432:5432'
 ```
 
-Create MySql database for test:
+Create MySql and Postgres databases for test:
 
 ```sh
 docker-compose up -d
@@ -39,10 +64,8 @@ docker-compose up -d
 Create user and set character:
 
 ```sh
-docker exec lambdaorm-test  mysql --host 127.0.0.1 --port 3306 -uroot -proot -e "CREATE DATABASE test2;"
-docker exec lambdaorm-test  mysql --host 127.0.0.1 --port 3306 -uroot -proot -e "ALTER DATABASE test CHARACTER SET utf8 COLLATE utf8_general_ci;"
-docker exec lambdaorm-test  mysql --host 127.0.0.1 --port 3306 -uroot -proot -e "ALTER DATABASE test2 CHARACTER SET utf8 COLLATE utf8_general_ci;"
-docker exec lambdaorm-test  mysql --host 127.0.0.1 --port 3306 -uroot -proot -e "GRANT ALL ON *.* TO 'test'@'%' with grant option; FLUSH PRIVILEGES;"
+docker exec lambdaorm-mysql  mysql --host 127.0.0.1 --port 3306 -uroot -proot -e "ALTER DATABASE test CHARACTER SET utf8 COLLATE utf8_general_ci;"
+docker exec lambdaorm-mysql  mysql --host 127.0.0.1 --port 3306 -uroot -proot -e "GRANT ALL ON *.* TO 'test'@'%' with grant option; FLUSH PRIVILEGES;"
 ```
 
 ### Install lambda ORM CLI
@@ -90,23 +113,15 @@ databases:
       user: test
       password: test
       database: test
-      multipleStatements: true
-      waitForConnections: true
-      connectionLimit: 10
-      queueLimit: 0
   - name: mydb2
-    dialect: mysql
+    dialect: postgres
     schema: countries2
     connection:
       host: localhost
-      port: 3306
+      port: 5432
       user: test
       password: test
-      database: test2
-      multipleStatements: true
-      waitForConnections: true
-      connectionLimit: 10
-      queueLimit: 0
+      database: test
 schemas:
   - name: countries
     entities:
@@ -127,13 +142,6 @@ schemas:
           - name: iso3
             length: 3
             nullable: false
-          - name: iso2
-            nullable: false
-            length: 2
-          - name: capital
-          - name: currency
-          - name: region
-          - name: subregion
         relations:
           - name: states
             type: manyToOne
@@ -154,6 +162,11 @@ schemas:
           - name: countryCode
             nullable: false
             length: 3
+        relations:
+          - name: country
+            from: countryCode
+            entity: Countries
+            to: iso3
   - name: countries2
     extends: countries
     excludeModel: true
@@ -172,16 +185,6 @@ schemas:
             mapping: NAME
           - name: iso3
             mapping: ISO_3
-          - name: iso2
-            mapping: ISO_2
-          - name: capital
-            mapping: CAPITAL
-          - name: currency
-            mapping: CURRENCY
-          - name: region
-            mapping: REGION
-          - name: subregion
-            mapping: SUB_REGION
       - name: States
         mapping: TBL_STATES
         properties:
@@ -190,7 +193,9 @@ schemas:
           - name: name
             mapping: NAME
           - name: countryCode
-            mapping: COUNTRY_CODE			
+            mapping: COUNTRY_CODE
+
+		
 ```
 
 ### Update
@@ -199,12 +204,12 @@ schemas:
 lambdaorm update
 ```
 
-the file model.ts will be created inside src/models/countries.
+the model will be created in file src/models/countries/model.ts .
 
 ### Sync
 
 ```sh
-lambdaorm sync
+lambdaorm sync -n mydb
 lambdaorm sync -n mydb2
 ```
 
@@ -225,7 +230,7 @@ lambdaorm run -e "Countries.bulkInsert().include(p => p.states)" -d ./data.json 
 test:
 
 ```sh
-lambdaorm run -e "Countries.page(1,10).include(p => p.states)"
+lambdaorm run -e "Countries.page(1,10).include(p => p.states)" -n mydb
 lambdaorm run -e "Countries.page(1,10).include(p => p.states)" -n mydb2
 ```
 
@@ -234,6 +239,12 @@ lambdaorm run -e "Countries.page(1,10).include(p => p.states)" -n mydb2
 ```sh
 lambdaorm run -e "States.deleteAll()" -n mydb2
 lambdaorm run -e "Countries.deleteAll()" -n mydb2
+```
+
+test:
+
+```sh
+lambdaorm run -e "Countries.page(1,10).include(p => p.states)" -n mydb2
 ```
 
 ### Export data from mydb
@@ -246,6 +257,12 @@ lambdaorm export  -n mydb
 
 ```sh
 lambdaorm import -s ./mydb-export.json -n mydb2
+```
+
+test:
+
+```sh
+lambdaorm run -e "Countries.page(1,10).include(p => p.states)" -n mydb2
 ```
 
 ### Drop
