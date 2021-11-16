@@ -193,9 +193,7 @@ schemas:
           - name: name
             mapping: NAME
           - name: countryCode
-            mapping: COUNTRY_CODE
-
-		
+            mapping: COUNTRY_CODE		
 ```
 
 ### Update
