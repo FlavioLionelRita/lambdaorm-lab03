@@ -12,7 +12,7 @@ In this laboratory we will see:
 
 In this scheme we can see how to extend the schema.
 
-![schema](schema2.png)
+![schema](schema3.png)
 
 We use the extends attribute in the definition of the schema to extend it.
 
