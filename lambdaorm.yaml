@@ -1,90 +1,48 @@
-app:
-  src: src
-  data: data
-  models: models
-  defaultDatabase: mydb
-databases:
-  - name: mydb
-    dialect: mysql
-    schema: countries
-    connection:
-      host: localhost
-      port: 3306
-      user: test
-      password: test
-      database: test
-  - name: mydb2
-    dialect: postgres
-    schema: countries2
-    connection:
-      host: localhost
-      port: 5432
-      user: test
-      password: test
-      database: test
-schemas:
-  - name: countries
+entities:
+  - name: Countries
+    primaryKey: ["iso3"]
+    uniqueKey: ["name"]
+    properties:
+      - name: name
+        nullable: false
+      - name: iso3
+        length: 3
+        nullable: false
+    relations:
+      - name: states
+        type: manyToOne
+        composite: true
+        from: iso3
+        entity: States
+        to: countryCode
+  - name: States
+    primaryKey: ["id"]
+    uniqueKey: ["countryCode", "name"]
+    properties:
+      - name: id
+        type: integer
+        nullable: false
+      - name: name
+        nullable: false
+      - name: countryCode
+        nullable: false
+        length: 3
+    relations:
+      - name: country
+        from: countryCode
+        entity: Countries
+        to: iso3
+mappings:
+  - name: mapping1
+  - name: mapping2
     entities:
-      - name: Positions
-        abstract: true
-        properties:
-          - name: latitude
-            length: 16
-          - name: longitude
-            length: 16
-      - name: Countries
-        extends: Positions
-        primaryKey: ["iso3"]
-        uniqueKey: ["name"]
-        properties:
-          - name: name
-            nullable: false
-          - name: iso3
-            length: 3
-            nullable: false
-        relations:
-          - name: states
-            type: manyToOne
-            composite: true
-            from: iso3
-            entity: States
-            to: countryCode
-      - name: States
-        extends: Positions
-        primaryKey: ["id"]
-        uniqueKey: ["countryCode", "name"]
-        properties:
-          - name: id
-            type: integer
-            nullable: false
-          - name: name
-            nullable: false
-          - name: countryCode
-            nullable: false
-            length: 3
-        relations:
-          - name: country
-            from: countryCode
-            entity: Countries
-            to: iso3
-  - name: countries2
-    extends: countries
-    excludeModel: true
-    entities:
-      - name: Positions
-        abstract: true
-        properties:
-          - name: latitude
-            mapping: LATITUDE
-          - name: longitude
-            mapping: LONGITUDE
       - name: Countries
         mapping: TBL_COUNTRIES
         properties:
+          - name: iso3
+            mapping: ISO3
           - name: name
             mapping: NAME
-          - name: iso3
-            mapping: ISO_3
       - name: States
         mapping: TBL_STATES
         properties:
@@ -94,3 +52,29 @@ schemas:
             mapping: NAME
           - name: countryCode
             mapping: COUNTRY_CODE
+dataSources:
+  - name: dataSource1
+    dialect: mysql
+    mapping: mapping1
+    connection:
+      host: localhost
+      port: 3306
+      user: test
+      password: test
+      database: test
+  - name: dataSource2
+    dialect: postgres
+    mapping: mapping2
+    connection:
+      host: localhost
+      port: 5432
+      user: test
+      password: test
+      database: test
+stages:
+  - name: stage1
+    dataSources:
+      - name: dataSource1
+  - name: stage2
+    dataSources:
+      - name: dataSource2

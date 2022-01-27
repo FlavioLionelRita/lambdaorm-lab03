@@ -2,26 +2,16 @@
 
 In this laboratory we will see:
 
+- how to work with two data sources with different mappings
+- how to define two stages and work with them
 - How to insert data from a file to more than one table.
-- how to extend entities using abstract entities
-- how to extend a schema to create a new one, overwriting the mapping
-- how to work with two schemas and databases that share the same model
-- how to use imported data from one database to import it into another
+- how to use data imported from one stage to import it to another
 
 ## Schema diagram
 
 In this scheme we can see how to extend the schema.
 
-![schema](schema3.png)
-
-We use the extends attribute in the definition of the schema to extend it.
-
-```yaml
-schemas:
-  - name: countries    
-  - name: countries2
-    extends: countries
-```
+![schema](schema3.svg)
 
 ## Pre requirements
 
@@ -98,93 +88,51 @@ In the creation of the project the schema was created but without any entity.
 Add the Country entity as seen in the following example
 
 ```yaml
-app:
-  src: src
-  data: data
-  models: models
-  defaultDatabase: mydb
-databases:
-  - name: mydb
-    dialect: mysql
-    schema: countries
-    connection:
-      host: localhost
-      port: 3306
-      user: test
-      password: test
-      database: test
-  - name: mydb2
-    dialect: postgres
-    schema: countries2
-    connection:
-      host: localhost
-      port: 5432
-      user: test
-      password: test
-      database: test
-schemas:
-  - name: countries
+entities:
+  - name: Countries
+    primaryKey: ["iso3"]
+    uniqueKey: ["name"]
+    properties:
+      - name: name
+        nullable: false
+      - name: iso3
+        length: 3
+        nullable: false
+    relations:
+      - name: states
+        type: manyToOne
+        composite: true
+        from: iso3
+        entity: States
+        to: countryCode
+  - name: States
+    primaryKey: ["id"]
+    uniqueKey: ["countryCode", "name"]
+    properties:
+      - name: id
+        type: integer
+        nullable: false
+      - name: name
+        nullable: false
+      - name: countryCode
+        nullable: false
+        length: 3
+    relations:
+      - name: country
+        from: countryCode
+        entity: Countries
+        to: iso3
+mappings:
+  - name: mapping1
+  - name: mapping2
     entities:
-      - name: Positions
-        abstract: true
-        properties:
-          - name: latitude
-            length: 16
-          - name: longitude
-            length: 16
-      - name: Countries
-        extends: Positions
-        primaryKey: ["iso3"]
-        uniqueKey: ["name"]
-        properties:
-          - name: name
-            nullable: false
-          - name: iso3
-            length: 3
-            nullable: false
-        relations:
-          - name: states
-            type: manyToOne
-            composite: true
-            from: iso3
-            entity: States
-            to: countryCode
-      - name: States
-        extends: Positions
-        primaryKey: ["id"]
-        uniqueKey: ["countryCode", "name"]
-        properties:
-          - name: id
-            type: integer
-            nullable: false
-          - name: name
-            nullable: false
-          - name: countryCode
-            nullable: false
-            length: 3
-        relations:
-          - name: country
-            from: countryCode
-            entity: Countries
-            to: iso3
-  - name: countries2
-    extends: countries
-    excludeModel: true
-    entities:
-      - name: Positions
-        abstract: true
-        properties:
-          - name: latitude
-            mapping: LATITUDE
-          - name: longitude
-            mapping: LONGITUDE
       - name: Countries
         mapping: TBL_COUNTRIES
         properties:
+          - name: iso3
+            mapping: ISO3
           - name: name
             mapping: NAME
-          - name: iso3
-            mapping: ISO_3
       - name: States
         mapping: TBL_STATES
         properties:
@@ -193,7 +141,33 @@ schemas:
           - name: name
             mapping: NAME
           - name: countryCode
-            mapping: COUNTRY_CODE		
+            mapping: COUNTRY_CODE
+dataSources:
+  - name: dataSource1
+    dialect: mysql
+    mapping: mapping1
+    connection:
+      host: localhost
+      port: 3306
+      user: test
+      password: test
+      database: test
+  - name: dataSource2
+    dialect: postgres
+    mapping: mapping2
+    connection:
+      host: localhost
+      port: 5432
+      user: test
+      password: test
+      database: test
+stages:
+  - name: stage1
+    dataSources:
+      - name: dataSource1
+  - name: stage2
+    dataSources:
+      - name: dataSource2		
 ```
 
 ### Update
@@ -207,69 +181,69 @@ the model will be created in file src/models/countries/model.ts .
 ### Sync
 
 ```sh
-lambdaorm sync -n mydb
-lambdaorm sync -n mydb2
+lambdaorm sync -s stage1
+lambdaorm sync -s stage2
 ```
 
 It will generate:
 
-- the Counties and States tables in database test and a status file "mydb-state.json" in the "data" folder.
-- the TBL_COUNTRIES and TBL_STATES tables in database test2 and a status file "mydb2-state.json" in the "data" folder.
+- the Counties and States tables in database test and a status file "stage1-state.json" in the "data" folder.
+- the TBL_COUNTRIES and TBL_STATES tables in database test2 and a status file "stage2-state.json" in the "data" folder.
 
 ### Popuplate Data
 
 then we execute
 
 ```sh
-lambdaorm run -e "Countries.bulkInsert().include(p => p.states)" -d ./data.json -n mydb
-lambdaorm run -e "Countries.bulkInsert().include(p => p.states)" -d ./data.json -n mydb2
+lambdaorm run -e "Countries.bulkInsert().include(p => p.states)" -d ./data.json -s stage1
+lambdaorm run -e "Countries.bulkInsert().include(p => p.states)" -d ./data.json -s stage2
 ```
 
 test:
 
 ```sh
-lambdaorm run -e "Countries.page(1,10).include(p => p.states)" -n mydb
-lambdaorm run -e "Countries.page(1,10).include(p => p.states)" -n mydb2
+lambdaorm run -e "Countries.page(1,10).include(p => p.states)" -s stage1
+lambdaorm run -e "Countries.page(1,10).include(p => p.states)" -s stage2
 ```
 
-### Delete data in Countries and states in mydb2
+### Delete data in Countries and states in stage2
 
 ```sh
-lambdaorm run -e "States.deleteAll()" -n mydb2
-lambdaorm run -e "Countries.deleteAll()" -n mydb2
-```
-
-test:
-
-```sh
-lambdaorm run -e "Countries.page(1,10).include(p => p.states)" -n mydb2
-```
-
-### Export data from mydb
-
-```sh
-lambdaorm export  -n mydb
-```
-
-### Import in mydb2 from data exported from mydb
-
-```sh
-lambdaorm import -s ./mydb-export.json -n mydb2
+lambdaorm run -e "States.deleteAll()" -s stage2
+lambdaorm run -e "Countries.deleteAll()" -s stage2
 ```
 
 test:
 
 ```sh
-lambdaorm run -e "Countries.page(1,10).include(p => p.states)" -n mydb2
+lambdaorm run -e "Countries.page(1,10).include(p => p.states)" -s stage2
+```
+
+### Export data from stage1
+
+```sh
+lambdaorm export  -s stage1
+```
+
+### Import in stage2 from data exported from stage1
+
+```sh
+lambdaorm import -d ./stage1-export.json -s stage2
+```
+
+test:
+
+```sh
+lambdaorm run -e "Countries.page(1,10).include(p => p.states)" -s stage2
 ```
 
 ### Drop
 
-remove all tables from the schema and delete the state file, mydb-state.json
+remove all tables from the schema and delete the state file stage1-state.json and stage2-state.json
 
 ```sh
-lambdaorm drop -n mydb
-lambdaorm drop -n mydb2
+lambdaorm drop -s stage1
+lambdaorm drop -s stage2
 ```
 
 ## End
